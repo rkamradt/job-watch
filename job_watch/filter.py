@@ -18,6 +18,8 @@ def passes_title(title: str, cfg: FilterConfig) -> bool:
     t = title.lower()
     if not any(kw in t for kw in cfg.title_include):
         return False
+    if not any(kw in t for kw in cfg.title_engineering):
+        return False
     if any(kw in t for kw in cfg.title_exclude):
         return False
     return True

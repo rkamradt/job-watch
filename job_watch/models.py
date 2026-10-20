@@ -31,11 +31,15 @@ class CompanyConfig(BaseModel):
 
 class FilterConfig(BaseModel):
     title_include: list[str] = Field(default_factory=lambda: [
-        "principal", "staff", "lead", "architect", "senior staff",
+        "principal", "staff", "lead", "senior staff",
+    ])
+    title_engineering: list[str] = Field(default_factory=lambda: [
+        "engineer", "developer", "architect", "swe", "software",
     ])
     title_exclude: list[str] = Field(default_factory=lambda: [
         "manager", "director", "intern", "data scientist", "sales",
         "recruiter", "business development", "emea", "apac", "latam",
+        "designer", "product manager", "program manager", "analyst",
     ])
     location_keep_patterns: list[str] = Field(default_factory=lambda: [
         "remote", "united states", " us ", "u.s.", "maine", "boston",

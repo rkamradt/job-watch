@@ -10,17 +10,21 @@ companies:
   - { name: Mattermost,  ats: greenhouse, slug: mattermost }
   - { name: "Hims & Hers", ats: ashby,   slug: hims-and-hers }  # 0 jobs as of 2026-10-20
   - { name: Weave,       ats: ashby,      slug: weave }           # 0 jobs as of 2026-10-20
-
-  # Lever example (uncomment and set slug to add a Lever company):
-  # - { name: Example,   ats: lever,      slug: example-co }
+  - { name: Arcadia,    ats: lever,      slug: arcadia }
 
 filter:
   title_include:
     - principal
     - staff
     - lead
-    - architect
     - "senior staff"
+
+  title_engineering:
+    - engineer
+    - developer
+    - architect
+    - swe
+    - software
 
   title_exclude:
     - manager
@@ -33,6 +37,10 @@ filter:
     - emea
     - apac
     - latam
+    - designer
+    - "product manager"
+    - "program manager"
+    - analyst
 
   # A job passes location if it matches no drop pattern AND either matches a keep
   # pattern or has an empty/unknown location. Matching is case-insensitive substring.
