@@ -10,7 +10,7 @@ kubectl create job job-watch-seed \
 | python3 -c "
 import sys, json
 doc = json.load(sys.stdin)
-doc['spec']['template']['spec']['containers'][0]['args'] = ['--seed']
+doc['spec']['template']['spec']['containers'][0]['args'] = ['python', '-m', 'job_watch', '--seed']
 print(json.dumps(doc))
 " | kubectl apply -f -
 
