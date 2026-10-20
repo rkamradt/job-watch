@@ -64,9 +64,16 @@ class FilterConfig(BaseModel):
     ])
 
 
+class ScreeningConfig(BaseModel):
+    enabled: bool = False
+    model: str = "claude-haiku-4-5-20251001"
+    candidate_profile: str = ""
+
+
 class AppConfig(BaseModel):
     companies: list[CompanyConfig]
     filter: FilterConfig = Field(default_factory=FilterConfig)
+    screening: ScreeningConfig = Field(default_factory=ScreeningConfig)
     concurrency_limit: int = 3
     request_timeout_sec: int = 30
     user_agent: str = "job-watch/0.1 (+https://github.com/rkamradt/job-watch)"

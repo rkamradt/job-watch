@@ -22,6 +22,7 @@ from job_watch.db import JobStore
 from job_watch.filter import ScoredJob, filter_and_score
 from job_watch.models import AppConfig, CompanyConfig, Job
 from job_watch.notify import send_digest
+from job_watch.screener import ScreenedJob, screen_jobs
 
 logging.basicConfig(
     level=logging.INFO,
@@ -109,12 +110,23 @@ async def run(*, seed: bool = False, config_path: str | None = None) -> None:
         logger.info("No new matches this run.")
         return
 
-    logger.info("%d new match(es) found.", len(new_matches))
+    logger.info("%d new match(es) found after keyword filter.", len(new_matches))
+
+    # AI screening (second pass) — only runs when enabled in config
+    if cfg.screening.enabled:
+        screened = await screen_jobs(new_matches, cfg.screening)
+    else:
+        screened = [ScreenedJob(scored=s, ai_passed=True, ai_reason="") for s in new_matches]
+
+    if not screened:
+        logger.info("No matches survived AI screening this run.")
+        return
 
     if seed:
         logger.info("--seed mode: state saved, no email sent.")
-        for s in new_matches:
-            logger.info("  [seeded] %s — %s (%s)", s.job.company, s.job.title, s.job.location)
+        for item in screened:
+            j = item.scored.job
+            logger.info("  [seeded] %s — %s (%s)", j.company, j.title, j.location)
         return
 
     gmail_user = os.environ["GMAIL_USER"]
@@ -122,7 +134,7 @@ async def run(*, seed: bool = False, config_path: str | None = None) -> None:
     gmail_to = os.environ.get("GMAIL_TO", "randykamradt@gmail.com")
 
     send_digest(
-        new_matches,
+        screened,
         gmail_user=gmail_user,
         gmail_app_password=gmail_app_password,
         to_addr=gmail_to,

@@ -4,6 +4,7 @@ set -euo pipefail
 
 : "${MONGO_URI:?Set MONGO_URI}"
 : "${GMAIL_APP_PASSWORD:?Set GMAIL_APP_PASSWORD}"
+: "${ANTHROPIC_API_KEY:?Set ANTHROPIC_API_KEY}"
 GMAIL_USER="${GMAIL_USER:-randykamradt@gmail.com}"
 GMAIL_TO="${GMAIL_TO:-randykamradt@gmail.com}"
 
@@ -13,6 +14,7 @@ kubectl create secret generic job-watch-secrets \
   --from-literal=GMAIL_USER="$GMAIL_USER" \
   --from-literal=GMAIL_APP_PASSWORD="$GMAIL_APP_PASSWORD" \
   --from-literal=GMAIL_TO="$GMAIL_TO" \
+  --from-literal=ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
   --dry-run=client -o yaml | kubectl apply -f -
 
 echo "Secret applied."

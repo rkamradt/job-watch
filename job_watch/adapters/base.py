@@ -67,7 +67,7 @@ def _strip_html(html: str) -> str:
     return text.strip()
 
 
-def snippet(raw: str, max_len: int = 300) -> str:
+def snippet(raw: str, max_len: int = 2000) -> str:
     """Return a plain-text snippet from raw HTML or plain text."""
     text = _strip_html(raw) if "<" in raw else raw
     if len(text) <= max_len:

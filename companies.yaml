@@ -106,6 +106,18 @@ filter:
     - llm
     - "machine learning"
 
+screening:
+  enabled: true
+  model: claude-haiku-4-5-20251001
+  candidate_profile: |
+    20+ years of software engineering experience. Deep expertise in Java and Kotlin for
+    distributed systems and microservices. Strong background in event-driven architecture
+    and Apache Kafka. Experienced with Kubernetes and cloud-native deployments. Also
+    comfortable with Go and Python. Interested in AI/LLM integration and platform
+    engineering. Looking for Staff or Principal Engineer or Architect roles. Prefers
+    US remote or Maine/Boston area. Not interested in management tracks, data science,
+    design, or non-engineering roles.
+
 # HTTP client settings
 concurrency_limit: 3
 request_timeout_sec: 30
