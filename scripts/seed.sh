@@ -6,12 +6,12 @@ set -euo pipefail
 kubectl create job job-watch-seed \
   --namespace job-watch \
   --from=cronjob/job-watch \
-  --dry-run=client -o yaml \
+  --dry-run=client -o json \
 | python3 -c "
-import sys, yaml
-doc = yaml.safe_load(sys.stdin)
+import sys, json
+doc = json.load(sys.stdin)
 doc['spec']['template']['spec']['containers'][0]['args'] = ['--seed']
-print(yaml.dump(doc))
+print(json.dumps(doc))
 " | kubectl apply -f -
 
 echo "Seed job created. Watch with: kubectl logs -n job-watch -l job-name=job-watch-seed -f"
