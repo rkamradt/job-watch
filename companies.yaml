@@ -1,0 +1,104 @@
+# Job board configuration for job-watch.
+# Mount this file via a Kubernetes ConfigMap at /config/companies.yaml.
+#
+# To verify a slug: job-watch check-slug <ats> <slug>
+
+companies:
+  - { name: Toast,       ats: greenhouse, slug: toast }
+  - { name: Smartsheet,  ats: greenhouse, slug: smartsheet }
+  - { name: Instacart,   ats: greenhouse, slug: instacart }
+  - { name: Mattermost,  ats: greenhouse, slug: mattermost }
+  - { name: "Hims & Hers", ats: ashby,   slug: hims-and-hers }  # 0 jobs as of 2026-10-20
+  - { name: Weave,       ats: ashby,      slug: weave }           # 0 jobs as of 2026-10-20
+
+  # Lever example (uncomment and set slug to add a Lever company):
+  # - { name: Example,   ats: lever,      slug: example-co }
+
+filter:
+  title_include:
+    - principal
+    - staff
+    - lead
+    - architect
+    - "senior staff"
+
+  title_exclude:
+    - manager
+    - director
+    - intern
+    - "data scientist"
+    - sales
+    - recruiter
+    - "business development"
+    - emea
+    - apac
+    - latam
+
+  # A job passes location if it matches no drop pattern AND either matches a keep
+  # pattern or has an empty/unknown location. Matching is case-insensitive substring.
+  location_keep_patterns:
+    - remote
+    - "united states"
+    - " us "
+    - "u.s."
+    - maine
+    - boston
+    - anywhere
+    - nationwide
+    - "new england"
+
+  location_drop_patterns:
+    - "united kingdom"
+    - " uk"
+    - england
+    - london
+    - ireland
+    - dublin
+    - canada
+    - toronto
+    - vancouver
+    - europe
+    - germany
+    - france
+    - netherlands
+    - spain
+    - sweden
+    - denmark
+    - norway
+    - finland
+    - poland
+    - bulgaria
+    - romania
+    - australia
+    - sydney
+    - india
+    - bangalore
+    - singapore
+    - "hong kong"
+    - japan
+    - china
+    - brazil
+    - mexico
+    - israel
+    - "tel aviv"
+    - "new zealand"
+    - "south africa"
+    - chennai
+    - taiwan
+    - "taipei"
+
+  boost_keywords:
+    - kafka
+    - kubernetes
+    - "event-driven"
+    - platform
+    - java
+    - kotlin
+    - " ai"
+    - llm
+    - "machine learning"
+
+# HTTP client settings
+concurrency_limit: 3
+request_timeout_sec: 30
+user_agent: "job-watch/0.1 (+https://github.com/rkamradt/job-watch)"
