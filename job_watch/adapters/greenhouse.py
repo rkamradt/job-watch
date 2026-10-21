@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 import httpx
 from dateutil import parser as dtparser
 
-from job_watch.adapters.base import get_with_retry, snippet
+from job_watch.adapters.base import full_text, get_with_retry, snippet
 from job_watch.models import CompanyConfig, Job
 
 logger = logging.getLogger(__name__)
@@ -58,6 +58,7 @@ class GreenhouseAdapter:
                 url=r.get("absolute_url", ""),
                 posted_at=posted_at,
                 description_snippet=snippet(content),
+                description=full_text(content),
             ))
         return jobs
 

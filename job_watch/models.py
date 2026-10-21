@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
+
+
+ReviewStatus = Literal["new", "interested", "applied", "skipped"]
 
 
 @dataclass
@@ -18,7 +21,8 @@ class Job:
     department: str
     url: str
     posted_at: Optional[datetime]
-    description_snippet: str  # plain text, max ~300 chars
+    description_snippet: str  # plain text, max ~2000 chars
+    description: str = ""    # full plain text, stored in MongoDB on first insert
 
 
 # ── Config models (Pydantic, loaded from YAML) ──────────────────────────────

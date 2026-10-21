@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 
 import httpx
 
-from job_watch.adapters.base import get_with_retry, snippet
+from job_watch.adapters.base import full_text, get_with_retry, snippet
 from job_watch.models import CompanyConfig, Job
 
 logger = logging.getLogger(__name__)
@@ -57,6 +57,7 @@ class LeverAdapter:
                 url=r.get("hostedUrl", ""),
                 posted_at=posted_at,
                 description_snippet=snippet(desc),
+                description=full_text(desc),
             ))
         return jobs
 

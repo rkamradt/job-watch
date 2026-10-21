@@ -41,8 +41,9 @@ jobs:
           git clone https://x-access-token:${{ secrets.HELM_CHARTS_PAT }}@github.com/rkamradt/rkamradt-helm-charts.git
           cd rkamradt-helm-charts
           printf 'image:\n  tag: "%s"\n' "${{ steps.tag.outputs.tag }}" > job-watch/version-values.yaml
+          printf 'image:\n  tag: "%s"\n' "${{ steps.tag.outputs.tag }}" > job-watch-mcp/version-values.yaml
           git config user.email "actions@github.com"
           git config user.name "GitHub Actions"
-          git add job-watch/version-values.yaml
+          git add job-watch/version-values.yaml job-watch-mcp/version-values.yaml
           git commit -m "Update job-watch image tag to ${{ steps.tag.outputs.tag }}"
           git push

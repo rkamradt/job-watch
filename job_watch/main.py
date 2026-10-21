@@ -200,10 +200,25 @@ def cli() -> None:
     cs.add_argument("ats", choices=list(adapter_registry.REGISTRY))
     cs.add_argument("slug")
 
+    ms = sub.add_parser("mcp", help="Start the MCP server for Claude integration.")
+    ms.add_argument(
+        "--http",
+        action="store_true",
+        help="Use streamable HTTP transport instead of stdio (for cluster deployment).",
+    )
+    ms.add_argument("--host", default="0.0.0.0", help="HTTP bind address (default: 0.0.0.0).")
+    ms.add_argument("--port", type=int, default=8000, help="HTTP port (default: 8000).")
+
     args = parser.parse_args()
 
     if args.command == "check-slug":
         asyncio.run(check_slug(args.ats, args.slug))
+    elif args.command == "mcp":
+        from job_watch.mcp.server import run_http, run_stdio
+        if args.http:
+            run_http(host=args.host, port=args.port)
+        else:
+            run_stdio()
     else:
         asyncio.run(run(seed=args.seed, config_path=args.config))
 
