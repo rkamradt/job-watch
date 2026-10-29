@@ -32,6 +32,43 @@ logging.basicConfig(
 logger = logging.getLogger("job_watch")
 
 
+async def _run_gmail_discovery(cfg: AppConfig, store: JobStore) -> None:
+    """Fetch job-alert emails and log discovered companies (PR 2 will resolve ATS)."""
+    from job_watch.sources.gmail import GmailSource
+
+    source = GmailSource(cfg.gmail_discovery, store.gmail_state)
+    leads = await source.fetch_leads()
+
+    if not leads:
+        logger.info("gmail_discovery: no new leads this run")
+        return
+
+    # Deduplicate by normalized company name within this batch
+    seen: set[str] = set()
+    for lead in leads:
+        key = _normalize_company(lead.company_name_raw)
+        if key in seen:
+            continue
+        seen.add(key)
+        logger.info(
+            "gmail_discovery: new lead company=%r title=%r location=%r sender=%s",
+            lead.company_name_raw,
+            lead.job_title,
+            lead.location_raw,
+            lead.sender,
+        )
+
+
+def _normalize_company(name: str) -> str:
+    """Lower-case, strip punctuation and common suffixes for deduplication."""
+    import re
+    n = name.lower().strip()
+    n = re.sub(r"[,\.'\"]", "", n)
+    n = re.sub(r"\b(inc|llc|ltd|corp|co|the)\b", "", n)
+    n = re.sub(r"\s+", " ", n).strip()
+    return n
+
+
 # ── Fetch one company, catching all errors so one failure doesn't abort the run ──
 
 async def _fetch_company(
@@ -61,6 +98,13 @@ async def run(*, seed: bool = False, config_path: str | None = None) -> None:
 
     store = JobStore(mongo_uri)
     await store.ensure_index()
+
+    # Gmail discovery — reads alert emails and logs new company leads
+    if cfg.gmail_discovery.enabled:
+        try:
+            await _run_gmail_discovery(cfg, store)
+        except Exception as exc:
+            logger.error("gmail_discovery: failed: %s", exc)
 
     now = datetime.now(tz=timezone.utc)
 

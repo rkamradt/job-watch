@@ -74,10 +74,34 @@ class ScreeningConfig(BaseModel):
     candidate_profile: str = ""
 
 
+class GmailDiscoveryConfig(BaseModel):
+    enabled: bool = False
+    alert_senders: list[str] = Field(default_factory=lambda: [
+        "jobalerts-noreply@linkedin.com",
+        "jobs-noreply@linkedin.com",
+        "donotreply@match.indeed.com",
+        "team@hi.wellfound.com",
+        "noreply@glassdoor.com",
+    ])
+    llm_fallback_enabled: bool = True
+    llm_fallback_model: str = "claude-haiku-4-5-20251001"
+
+
 class AppConfig(BaseModel):
     companies: list[CompanyConfig]
     filter: FilterConfig = Field(default_factory=FilterConfig)
     screening: ScreeningConfig = Field(default_factory=ScreeningConfig)
+    gmail_discovery: GmailDiscoveryConfig = Field(default_factory=GmailDiscoveryConfig)
     concurrency_limit: int = 3
     request_timeout_sec: int = 30
     user_agent: str = "job-watch/0.1 (+https://github.com/rkamradt/job-watch)"
+
+
+@dataclass
+class ExtractedLead:
+    """A company/job lead parsed from a single job-alert email."""
+    company_name_raw: str
+    job_title: str
+    location_raw: str
+    sender: str
+    gmail_message_id: str

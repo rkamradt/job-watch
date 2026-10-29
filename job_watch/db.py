@@ -30,10 +30,29 @@ def _doc_to_dict(doc: dict) -> dict:
     return result
 
 
+class GmailStateStore:
+    """Tracks Gmail history ID so each message is read exactly once."""
+
+    def __init__(self, client: motor.motor_asyncio.AsyncIOMotorClient) -> None:
+        self._col = client["job-watch"]["gmail_state"]
+
+    async def get_history_id(self) -> str | None:
+        doc = await self._col.find_one({"_id": "singleton"})
+        return doc["history_id"] if doc else None
+
+    async def set_history_id(self, history_id: str, checked_at: datetime) -> None:
+        await self._col.update_one(
+            {"_id": "singleton"},
+            {"$set": {"history_id": history_id, "last_checked": checked_at}},
+            upsert=True,
+        )
+
+
 class JobStore:
     def __init__(self, mongo_uri: str) -> None:
         self._client = motor.motor_asyncio.AsyncIOMotorClient(mongo_uri)
         self._col = self._client["job-watch"]["seen_jobs"]
+        self.gmail_state = GmailStateStore(self._client)
 
     async def ensure_index(self) -> None:
         await self._col.create_index(
