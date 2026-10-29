@@ -74,6 +74,9 @@ class ScreeningConfig(BaseModel):
     candidate_profile: str = ""
 
 
+DiscoveredStatus = Literal["candidate", "active", "rejected"]
+
+
 class GmailDiscoveryConfig(BaseModel):
     enabled: bool = False
     alert_senders: list[str] = Field(default_factory=lambda: [
@@ -85,6 +88,9 @@ class GmailDiscoveryConfig(BaseModel):
     ])
     llm_fallback_enabled: bool = True
     llm_fallback_model: str = "claude-haiku-4-5-20251001"
+    auto_activate: bool = False
+    probe_rate_limit_delay: float = 2.0
+    negative_cache_ttl_days: int = 30
 
 
 class AppConfig(BaseModel):

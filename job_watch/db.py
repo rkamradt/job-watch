@@ -9,7 +9,7 @@ from typing import Any
 import motor.motor_asyncio
 from bson import ObjectId
 
-from job_watch.models import Job, ReviewStatus
+from job_watch.models import DiscoveredStatus, Job, ReviewStatus
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +28,118 @@ def _doc_to_dict(doc: dict) -> dict:
         if isinstance(updated, datetime):
             review["updated_at"] = updated.isoformat()
     return result
+
+
+def _discovered_to_dict(doc: dict) -> dict:
+    result = dict(doc)
+    result["name_normalized"] = result.pop("_id")
+    for key in ("first_seen", "probed_at", "negative_cache_until"):
+        val = result.get(key)
+        if isinstance(val, datetime):
+            result[key] = val.isoformat()
+    source = result.get("source", {})
+    if isinstance(source.get("first_seen"), datetime):
+        source["first_seen"] = source["first_seen"].isoformat()
+    probe = result.get("probe")
+    if isinstance(probe, dict):
+        for k in ("probed_at", "negative_cache_until"):
+            if isinstance(probe.get(k), datetime):
+                probe[k] = probe[k].isoformat()
+    return result
+
+
+class DiscoveredCompanyStore:
+    """Tracks companies discovered from job-alert emails."""
+
+    def __init__(self, client: motor.motor_asyncio.AsyncIOMotorClient) -> None:
+        self._col = client["job-watch"]["discovered_companies"]
+
+    async def ensure_index(self) -> None:
+        await self._col.create_index([("status", 1)], name="status")
+        await self._col.create_index([("source.first_seen", -1)], name="source_first_seen")
+
+    async def exists(self, name_normalized: str) -> bool:
+        doc = await self._col.find_one({"_id": name_normalized}, projection={"_id": 1})
+        return doc is not None
+
+    async def insert_candidate(
+        self,
+        name_normalized: str,
+        name_raw: str,
+        sender: str,
+        gmail_message_id: str,
+        job_title_trigger: str,
+        now: datetime,
+    ) -> bool:
+        """Insert a new candidate. Returns True if inserted, False if already exists."""
+        try:
+            await self._col.insert_one({
+                "_id": name_normalized,
+                "name_raw": name_raw,
+                "source": {
+                    "sender": sender,
+                    "gmail_message_id": gmail_message_id,
+                    "first_seen": now,
+                    "job_title_trigger": job_title_trigger,
+                },
+                "ats": None,
+                "slug": None,
+                "status": "candidate",
+                "probe": None,
+            })
+            return True
+        except Exception:
+            return False  # duplicate _id → already exists
+
+    async def update_probe(
+        self,
+        name_normalized: str,
+        *,
+        ats: str | None,
+        slug: str | None,
+        slugs_tried: list[str],
+        negative_cache_until: datetime | None,
+        now: datetime,
+    ) -> None:
+        set_fields: dict[str, Any] = {
+            "probe": {
+                "probed_at": now,
+                "slugs_tried": slugs_tried,
+                "negative_cache_until": negative_cache_until,
+            },
+        }
+        if ats is not None:
+            set_fields["ats"] = ats
+            set_fields["slug"] = slug
+        await self._col.update_one({"_id": name_normalized}, {"$set": set_fields})
+
+    async def set_status(self, name_normalized: str, status: DiscoveredStatus) -> bool:
+        result = await self._col.update_one(
+            {"_id": name_normalized},
+            {"$set": {"status": status}},
+        )
+        return result.matched_count > 0
+
+    async def get_negative_cache_until(self, name_normalized: str) -> datetime | None:
+        doc = await self._col.find_one(
+            {"_id": name_normalized},
+            projection={"probe.negative_cache_until": 1},
+        )
+        if not doc:
+            return None
+        return (doc.get("probe") or {}).get("negative_cache_until")
+
+    async def list_discovered(self, status: str = "") -> list[dict]:
+        filt: dict[str, Any] = {}
+        if status:
+            filt["status"] = status
+        cursor = self._col.find(filt).sort([("source.first_seen", -1)])
+        docs = await cursor.to_list(length=None)
+        return [_discovered_to_dict(doc) for doc in docs]
+
+    async def get_by_normalized(self, name_normalized: str) -> dict | None:
+        doc = await self._col.find_one({"_id": name_normalized})
+        return _discovered_to_dict(doc) if doc else None
 
 
 class GmailStateStore:
@@ -53,8 +165,10 @@ class JobStore:
         self._client = motor.motor_asyncio.AsyncIOMotorClient(mongo_uri)
         self._col = self._client["job-watch"]["seen_jobs"]
         self.gmail_state = GmailStateStore(self._client)
+        self.discovered = DiscoveredCompanyStore(self._client)
 
     async def ensure_index(self) -> None:
+        await self.discovered.ensure_index()
         await self._col.create_index(
             [("ats", 1), ("company", 1), ("id", 1)],
             unique=True,

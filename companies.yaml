@@ -128,6 +128,9 @@ gmail_discovery:
     - noreply@glassdoor.com
   llm_fallback_enabled: true
   llm_fallback_model: claude-haiku-4-5-20251001
+  auto_activate: false          # true → promote candidate→active automatically when a board is found
+  probe_rate_limit_delay: 2.0   # seconds between ATS probe attempts
+  negative_cache_ttl_days: 30   # days before re-probing a company with no board found
   # Credentials from K8s secret (env vars): GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN
   # Run scripts/gmail_auth.py once locally to generate them.
 

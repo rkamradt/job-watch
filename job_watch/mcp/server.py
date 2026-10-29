@@ -179,6 +179,55 @@ async def mark_job(
 
 
 @mcp.tool()
+async def list_discovered(ctx: Context, status: str = "") -> list[dict]:
+    """List companies discovered from job-alert emails, optionally filtered by status.
+
+    Args:
+        status: Filter by status: candidate, active, rejected, or "" for all.
+                - candidate: found in an alert email; ATS board not yet confirmed or awaiting approval
+                - active: board confirmed; will be polled on the next run
+                - rejected: manually excluded via set_company_status
+
+    Returns each company's normalized name, raw name, source info, ATS/slug if found,
+    status, and probe result.
+    """
+    valid = {"", "candidate", "active", "rejected"}
+    if status not in valid:
+        return [{"error": f"Invalid status {status!r}. Valid: candidate, active, rejected, or empty string for all."}]
+
+    lc = ctx.request_context.lifespan_context
+    store: JobStore = lc["store"]
+    return await store.discovered.list_discovered(status)
+
+
+@mcp.tool()
+async def set_company_status(ctx: Context, name_normalized: str, status: str) -> dict:
+    """Approve or reject a discovered company.
+
+    Use this after list_discovered to act on candidates:
+      - "active"   → approve; the company will be polled on the next run
+      - "rejected" → exclude; it will not appear in future list_discovered results unless filtered
+      - "candidate" → reset to unreviewed
+
+    Args:
+        name_normalized: The name_normalized value from list_discovered.
+        status: One of: active, rejected, candidate.
+
+    Returns {"ok": true} on success, {"ok": false, "error": "..."} on failure.
+    """
+    valid = {"candidate", "active", "rejected"}
+    if status not in valid:
+        return {"ok": False, "error": f"Invalid status {status!r}. Valid: {', '.join(sorted(valid))}"}
+
+    lc = ctx.request_context.lifespan_context
+    store: JobStore = lc["store"]
+    updated = await store.discovered.set_status(name_normalized, status)  # type: ignore[arg-type]
+    if not updated:
+        return {"ok": False, "error": f"Company {name_normalized!r} not found in discovered_companies"}
+    return {"ok": True}
+
+
+@mcp.tool()
 async def suggest_company(
     ctx: Context,
     name: str,

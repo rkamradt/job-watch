@@ -33,40 +33,91 @@ logger = logging.getLogger("job_watch")
 
 
 async def _run_gmail_discovery(cfg: AppConfig, store: JobStore) -> None:
-    """Fetch job-alert emails and log discovered companies (PR 2 will resolve ATS)."""
+    """Fetch job-alert emails, store new companies, and probe their ATS boards."""
+    from job_watch.discovery.resolver import ATSResolver, normalize_company
     from job_watch.sources.gmail import GmailSource
 
-    source = GmailSource(cfg.gmail_discovery, store.gmail_state)
+    dcfg = cfg.gmail_discovery
+    source = GmailSource(dcfg, store.gmail_state)
     leads = await source.fetch_leads()
 
     if not leads:
         logger.info("gmail_discovery: no new leads this run")
         return
 
-    # Deduplicate by normalized company name within this batch
-    seen: set[str] = set()
+    # Build set of already-watched company keys to skip duplicates
+    watched: set[str] = {normalize_company(c.name) for c in cfg.companies}
+
+    resolver = ATSResolver(
+        rate_limit_delay=dcfg.probe_rate_limit_delay,
+        user_agent=cfg.user_agent,
+    )
+    now = datetime.now(tz=timezone.utc)
+
+    # Deduplicate within this batch too
+    batch_seen: set[str] = set()
+
     for lead in leads:
-        key = _normalize_company(lead.company_name_raw)
-        if key in seen:
+        key = normalize_company(lead.company_name_raw)
+        if key in batch_seen or key in watched:
             continue
-        seen.add(key)
+        batch_seen.add(key)
+
+        # Skip if already in discovered_companies
+        if await store.discovered.exists(key):
+            continue
+
+        inserted = await store.discovered.insert_candidate(
+            name_normalized=key,
+            name_raw=lead.company_name_raw,
+            sender=lead.sender,
+            gmail_message_id=lead.gmail_message_id,
+            job_title_trigger=lead.job_title,
+            now=now,
+        )
+        if not inserted:
+            continue  # race condition, another run beat us
+
         logger.info(
-            "gmail_discovery: new lead company=%r title=%r location=%r sender=%s",
-            lead.company_name_raw,
-            lead.job_title,
-            lead.location_raw,
-            lead.sender,
+            "gmail_discovery: new candidate %r (trigger: %r)", lead.company_name_raw, lead.job_title
         )
 
+        # Check negative cache before probing
+        cached_until = await store.discovered.get_negative_cache_until(key)
+        if cached_until and cached_until > now:
+            logger.info(
+                "gmail_discovery: %r in negative cache until %s — skipping probe",
+                key, cached_until.isoformat(),
+            )
+            continue
 
-def _normalize_company(name: str) -> str:
-    """Lower-case, strip punctuation and common suffixes for deduplication."""
-    import re
-    n = name.lower().strip()
-    n = re.sub(r"[,\.'\"]", "", n)
-    n = re.sub(r"\b(inc|llc|ltd|corp|co|the)\b", "", n)
-    n = re.sub(r"\s+", " ", n).strip()
-    return n
+        result, slugs_tried = await resolver.probe(lead.company_name_raw)
+
+        if result:
+            neg_until = None
+            new_status = "active" if dcfg.auto_activate else "candidate"
+        else:
+            neg_until = now + timedelta(days=dcfg.negative_cache_ttl_days)
+            new_status = "candidate"
+
+        await store.discovered.update_probe(
+            key,
+            ats=result.ats if result else None,
+            slug=result.slug if result else None,
+            slugs_tried=slugs_tried,
+            negative_cache_until=neg_until,
+            now=now,
+        )
+        if result:
+            await store.discovered.set_status(key, new_status)  # type: ignore[arg-type]
+            if dcfg.auto_activate:
+                cfg.companies.append(
+                    CompanyConfig(name=lead.company_name_raw, ats=result.ats, slug=result.slug)
+                )
+                logger.info(
+                    "gmail_discovery: auto-activated %r (%s/%s)",
+                    lead.company_name_raw, result.ats, result.slug,
+                )
 
 
 # ── Fetch one company, catching all errors so one failure doesn't abort the run ──
