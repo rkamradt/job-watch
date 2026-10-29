@@ -140,9 +140,16 @@ async def list_companies(ctx: Context) -> list[dict]:
 
 @mcp.tool()
 async def stats(ctx: Context) -> dict:
-    """Return aggregate counts: total open, new this week, by company, by review status.
+    """Return aggregate counts: total open, new this week, by company, by review status,
+    and LLM scoring coverage.
 
-    Review status counts treat jobs with no status as 'new'.
+    Fields:
+      total_open       — all open (non-closed) jobs
+      new_this_week    — jobs first seen in the past 7 days
+      by_company       — {company: count} for open jobs
+      by_review_status — {status: count}; jobs with no review are counted as 'new'
+      scored_jobs      — open jobs that have an llm_score cached
+      avg_llm_score    — average llm_score of scored open jobs (null if none scored yet)
     """
     lc = ctx.request_context.lifespan_context
     store: JobStore = lc["store"]
@@ -317,6 +324,32 @@ async def filter_criteria() -> str:
         lines += [
             "",
             "## Candidate profile (used for AI screening):",
+            cfg.screening.candidate_profile,
+        ]
+    return "\n".join(lines)
+
+
+@mcp.resource("resource://job-watch/scoring-profile")
+async def scoring_profile() -> str:
+    """Your LLM scoring configuration: threshold, daily cap, and dealbreakers."""
+    cfg = load_config()
+    sc = cfg.llm_scoring
+    lines = [
+        "# job-watch — LLM Scoring Profile",
+        "",
+        f"Enabled: {sc.enabled}",
+        f"Threshold: {sc.threshold}  (jobs below this score are not emailed)",
+        f"Daily cap: {sc.daily_cap} calls",
+        f"Model: {sc.model}",
+        f"Remote US required: {sc.remote_us_required}",
+        "",
+        "## Dealbreakers (auto-fail if present):",
+        *[f"  - {d}" for d in sc.dealbreakers],
+    ]
+    if cfg.screening.candidate_profile:
+        lines += [
+            "",
+            "## Candidate profile:",
             cfg.screening.candidate_profile,
         ]
     return "\n".join(lines)

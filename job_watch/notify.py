@@ -70,7 +70,7 @@ def _score_badge(item: ScreenedJob) -> str:
     )
 
 
-def _build_html(jobs: list[ScreenedJob], now: datetime) -> str:
+def _build_html(jobs: list[ScreenedJob], now: datetime, extra_html: str = "") -> str:
     rows: list[str] = []
     for item in jobs:
         s = item.scored
@@ -126,11 +126,65 @@ def _build_html(jobs: list[ScreenedJob], now: datetime) -> str:
       {"".join(rows)}
     </tbody>
   </table>
+  {extra_html}
   <p style="font-size:11px;color:#999;margin-top:24px">
     job-watch · <a href="https://github.com/rkamradt/job-watch">github.com/rkamradt/job-watch</a>
   </p>
 </body>
 </html>"""
+
+
+def _build_discovered_plain(discovered: list[dict]) -> str:
+    if not discovered:
+        return ""
+    lines: list[str] = [
+        "",
+        "=" * 60,
+        f"Discovered companies this week ({len(discovered)})",
+        "=" * 60,
+        "",
+    ]
+    for d in discovered:
+        status = d.get("status", "candidate")
+        ats_info = f"{d['ats']}/{d['slug']}" if d.get("ats") else "board not found yet"
+        lines.append(f"  {d['name_raw']}  [{status}]  ({ats_info})")
+        src = d.get("source", {})
+        lines.append(f"    Trigger: {src.get('job_title_trigger', '')}  via {src.get('sender', '')}")
+        lines.append("")
+    return "\n".join(lines)
+
+
+def _build_discovered_html(discovered: list[dict]) -> str:
+    if not discovered:
+        return ""
+    rows = []
+    for d in discovered:
+        status = d.get("status", "candidate")
+        badge_color = "#2a6496" if status == "active" else "#888"
+        ats_info = f"{d['ats']}/{d['slug']}" if d.get("ats") else "—"
+        src = d.get("source", {})
+        rows.append(
+            f'<tr style="border-bottom:1px solid #eee">'
+            f'<td style="padding:6px 4px"><strong>{d["name_raw"]}</strong>'
+            f'  <span style="background:{badge_color};color:#fff;padding:1px 5px;'
+            f'border-radius:3px;font-size:10px">{status}</span></td>'
+            f'<td style="padding:6px 4px;color:#555;font-size:12px">{ats_info}</td>'
+            f'<td style="padding:6px 4px;color:#555;font-size:12px">'
+            f'{src.get("job_title_trigger","")}</td>'
+            f'</tr>'
+        )
+    return (
+        '<h3 style="margin-top:32px;border-top:1px solid #ccc;padding-top:16px">'
+        f'Discovered companies this week ({len(discovered)})</h3>'
+        '<table style="width:100%;border-collapse:collapse;font-size:13px">'
+        '<thead><tr>'
+        '<th style="text-align:left;padding:4px">Company</th>'
+        '<th style="text-align:left;padding:4px">Board</th>'
+        '<th style="text-align:left;padding:4px">Trigger title</th>'
+        '</tr></thead><tbody>'
+        + "".join(rows)
+        + "</tbody></table>"
+    )
 
 
 def send_digest(
@@ -139,11 +193,13 @@ def send_digest(
     gmail_user: str,
     gmail_app_password: str,
     to_addr: str,
+    discovered: list[dict] | None = None,
 ) -> None:
     now = datetime.now(tz=timezone.utc)
     subject = _build_subject(jobs)
-    plain = _build_plain(jobs, now)
-    html = _build_html(jobs, now)
+    plain = _build_plain(jobs, now) + _build_discovered_plain(discovered or [])
+    disc_html = _build_discovered_html(discovered or [])
+    html = _build_html(jobs, now, extra_html=disc_html)
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject

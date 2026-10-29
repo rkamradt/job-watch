@@ -239,11 +239,23 @@ async def run(*, seed: bool = False, config_path: str | None = None) -> None:
     gmail_app_password = os.environ["GMAIL_APP_PASSWORD"]
     gmail_to = os.environ.get("GMAIL_TO", "randykamradt@gmail.com")
 
+    discovered_this_week: list[dict] = []
+    if cfg.gmail_discovery.enabled:
+        try:
+            discovered_this_week = await store.discovered.get_discovered_since(days=7)
+            # Only show candidate and active in the digest, not rejected
+            discovered_this_week = [
+                d for d in discovered_this_week if d.get("status") != "rejected"
+            ]
+        except Exception as exc:
+            logger.warning("digest: failed to fetch discovered companies: %s", exc)
+
     send_digest(
         screened,
         gmail_user=gmail_user,
         gmail_app_password=gmail_app_password,
         to_addr=gmail_to,
+        discovered=discovered_this_week,
     )
     store.close()
 

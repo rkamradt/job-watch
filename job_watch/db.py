@@ -27,6 +27,11 @@ def _doc_to_dict(doc: dict) -> dict:
         updated = review.get("updated_at")
         if isinstance(updated, datetime):
             review["updated_at"] = updated.isoformat()
+    llm_score = result.get("llm_score")
+    if isinstance(llm_score, dict):
+        scored_at = llm_score.get("scored_at")
+        if isinstance(scored_at, datetime):
+            llm_score["scored_at"] = scored_at.isoformat()
     return result
 
 
@@ -140,6 +145,15 @@ class DiscoveredCompanyStore:
     async def get_by_normalized(self, name_normalized: str) -> dict | None:
         doc = await self._col.find_one({"_id": name_normalized})
         return _discovered_to_dict(doc) if doc else None
+
+    async def get_discovered_since(self, days: int = 7) -> list[dict]:
+        """Return companies first seen in the last N days, newest first."""
+        cutoff = datetime.now(tz=timezone.utc) - timedelta(days=days)
+        cursor = self._col.find(
+            {"source.first_seen": {"$gte": cutoff}}
+        ).sort([("source.first_seen", -1)])
+        docs = await cursor.to_list(length=None)
+        return [_discovered_to_dict(doc) for doc in docs]
 
 
 class ScoringUsageStore:
@@ -377,11 +391,23 @@ class JobStore:
         ]):
             by_status[doc["_id"]] = doc["count"]
 
+        scored_count = 0
+        avg_llm_score: float | None = None
+        async for doc in self._col.aggregate([
+            {"$match": {"closed_at": None, "llm_score": {"$exists": True}}},
+            {"$group": {"_id": None, "count": {"$sum": 1}, "avg": {"$avg": "$llm_score.score"}}},
+        ]):
+            scored_count = doc["count"]
+            avg = doc.get("avg")
+            avg_llm_score = round(avg, 1) if avg is not None else None
+
         return {
             "total_open": total_open,
             "new_this_week": new_this_week,
             "by_company": by_company,
             "by_review_status": by_status,
+            "scored_jobs": scored_count,
+            "avg_llm_score": avg_llm_score,
         }
 
     async def update_review(
