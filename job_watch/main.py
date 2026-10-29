@@ -151,6 +151,7 @@ async def run(*, seed: bool = False, config_path: str | None = None) -> None:
     await store.ensure_index()
 
     # Gmail discovery — reads alert emails and logs new company leads
+    print(f"DEBUG gmail_discovery.enabled={cfg.gmail_discovery.enabled}", flush=True)
     logger.info("gmail_discovery: enabled=%s", cfg.gmail_discovery.enabled)
     if cfg.gmail_discovery.enabled:
         try:
