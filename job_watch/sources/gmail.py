@@ -231,5 +231,11 @@ class GmailSource:
             leads = await parse_with_llm(
                 html_body, sender, msg_id, self._cfg.llm_fallback_model
             )
+        elif not leads:
+            logger.debug(
+                "parsers: no leads and llm_fallback disabled for sender=%s message_id=%s",
+                sender,
+                msg_id,
+            )
 
         return leads

@@ -25,7 +25,11 @@ Return a JSON array.  Each element must have exactly these keys:
 
 Return only the JSON array, no other text.
 If no job postings are found, return [].
-Limit to at most 20 results."""
+Limit to at most 20 results.
+
+Ignore navigation links, footer links, 'Manage Settings', 'Privacy Policy', \
+'Unsubscribe', and similar non-job content. Only return entries where both the \
+employer name AND job title are clearly present."""
 
 
 async def parse_with_llm(

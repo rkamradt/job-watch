@@ -12,21 +12,39 @@ from bs4 import BeautifulSoup
 
 from job_watch.models import ExtractedLead
 
+_FOOTER_TEXTS = {
+    "manage settings", "privacy policy", "terms of use", "terms & conditions",
+    "unsubscribe", "view in browser", "help center", "contact us",
+    "email preferences", "opt out", "do not sell", "cookie policy",
+    "copyright", "all rights reserved", "download the app",
+}
+
+_JOB_PATH_PATTERNS = {"/jobs/", "/company/", "/role/"}
+
 
 def parse(html_body: str, sender: str, message_id: str) -> list[ExtractedLead]:
     soup = BeautifulSoup(html_body, "html.parser")
     leads: list[ExtractedLead] = []
 
     # Wellfound job links point to wellfound.com/jobs or angel.co
+    # Require job-specific URL patterns to avoid footer/nav links
     for anchor in soup.find_all("a", href=True):
         href = anchor.get("href", "")
         if "wellfound.com" not in href and "angel.co" not in href:
+            continue
+        # Require job-specific URL patterns for wellfound.com links
+        if "wellfound.com" in href and not any(pat in href for pat in _JOB_PATH_PATTERNS):
             continue
 
         title = anchor.get_text(strip=True)
         if not title or len(title) > 120:
             continue
         if title.lower() in {"view all", "unsubscribe", "wellfound", "view job", "apply"}:
+            continue
+        if title.lower().strip() in _FOOTER_TEXTS:
+            continue
+        # Max-word guard: job titles are rarely more than 10 words
+        if len(title.split()) > 10:
             continue
 
         company = ""

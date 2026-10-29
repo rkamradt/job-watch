@@ -36,6 +36,11 @@ _LINKEDIN_HTML = """
     </td>
   </tr>
 </table>
+<table>
+  <tr><td><a href="https://www.linkedin.com/help">Help Center</a></td></tr>
+  <tr><td><a href="https://www.linkedin.com/legal/privacy-policy">Privacy Policy</a></td></tr>
+  <tr><td><a href="https://www.linkedin.com/psettings/guest-controls">Unsubscribe</a></td></tr>
+</table>
 </body></html>
 """
 
@@ -51,6 +56,11 @@ _INDEED_HTML = """
   Instacart
   Remote, US
 </div>
+<table>
+  <tr><td><a href="https://www.indeed.com/legal/terms-of-service">Terms of Use</a></td></tr>
+  <tr><td><a href="https://www.indeed.com/prefs?hl=en">Manage Settings</a></td></tr>
+  <tr><td><a href="https://www.indeed.com/unsubscribe">Unsubscribe</a></td></tr>
+</table>
 </body></html>
 """
 
@@ -61,6 +71,11 @@ _WELLFOUND_HTML = """
   <a href="https://wellfound.com/jobs/123-principal-engineer">Principal Engineer</a>
   <span>Remote</span>
 </div>
+<table>
+  <tr><td><a href="https://wellfound.com/privacy">Privacy Policy</a></td></tr>
+  <tr><td><a href="https://wellfound.com/terms">Terms &amp; Conditions</a></td></tr>
+  <tr><td><a href="https://wellfound.com/unsubscribe">Unsubscribe</a></td></tr>
+</table>
 </body></html>
 """
 
@@ -72,6 +87,13 @@ _GLASSDOOR_HTML = """
   </a>
   · Toast · Remote, US · $160K–$200K
 </div>
+<table>
+  <tr>
+    <td><a href="https://www.glassdoor.com/email-preferences">Manage Settings</a></td>
+    <td><a href="https://www.glassdoor.com/about/privacy.htm">Privacy Policy</a></td>
+    <td><a href="https://www.glassdoor.com/member/main/unsubscribe-email.htm">Unsubscribe</a></td>
+  </tr>
+</table>
 </body></html>
 """
 
@@ -109,6 +131,32 @@ def test_glassdoor_parser_extracts_leads():
     leads = glassdoor.parse(_GLASSDOOR_HTML, "noreply@glassdoor.com", "msg4")
     assert len(leads) >= 1
     assert any("Staff Engineer" in l.job_title for l in leads)
+
+
+def test_glassdoor_rejects_manage_settings():
+    """Glassdoor footer link to /email-preferences must not appear in leads."""
+    leads = glassdoor.parse(_GLASSDOOR_HTML, "noreply@glassdoor.com", "msg4")
+    titles = [l.job_title for l in leads]
+    assert "Manage Settings" not in titles
+    assert not any("manage settings" in t.lower() for t in titles)
+
+
+def test_indeed_rejects_footer_links():
+    """Indeed footer links (unsubscribe, terms, manage settings) must not appear in leads."""
+    leads = indeed.parse(_INDEED_HTML, "donotreply@match.indeed.com", "msg2")
+    titles = [l.job_title for l in leads]
+    assert "Terms of Use" not in titles
+    assert "Manage Settings" not in titles
+    assert "Unsubscribe" not in titles
+
+
+def test_wellfound_rejects_footer_links():
+    """Wellfound footer links (privacy, terms, unsubscribe) must not appear in leads."""
+    leads = wellfound.parse(_WELLFOUND_HTML, "team@hi.wellfound.com", "msg3")
+    titles = [l.job_title for l in leads]
+    assert "Privacy Policy" not in titles
+    assert "Terms & Conditions" not in titles
+    assert "Unsubscribe" not in titles
 
 
 def test_run_parsers_dispatches_by_sender():

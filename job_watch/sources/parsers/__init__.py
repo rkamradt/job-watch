@@ -8,8 +8,12 @@ The registry maps a normalized sender address to its parser function.
 
 from __future__ import annotations
 
+import logging
+
 from job_watch.models import ExtractedLead
 from job_watch.sources.parsers import glassdoor, indeed, linkedin, wellfound
+
+logger = logging.getLogger(__name__)
 
 # Maps lowercase sender address → parser callable
 REGISTRY: dict[str, object] = {
@@ -31,4 +35,10 @@ def run_parsers(
     if parser is None:
         return []
     leads: list[ExtractedLead] = parser(html_body, sender, message_id)  # type: ignore[call-arg]
+    logger.info(
+        "parsers: sender=%s html_leads=%d message_id=%s",
+        sender,
+        len(leads),
+        message_id,
+    )
     return leads
