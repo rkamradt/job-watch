@@ -28,7 +28,7 @@ class AshbyAdapter:
             client, url, params={"includeCompensation": "true"}
         )
         data = resp.json()
-        raw_jobs = data.get("jobPostings", [])
+        raw_jobs = data.get("jobs", [])
         logger.info("Ashby %s: %d jobs fetched", company.name, len(raw_jobs))
 
         jobs: list[Job] = []

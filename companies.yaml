@@ -8,8 +8,8 @@ companies:
   - { name: Smartsheet,  ats: greenhouse, slug: smartsheet }
   - { name: Instacart,   ats: greenhouse, slug: instacart }
   - { name: Mattermost,  ats: greenhouse, slug: mattermost }
-  - { name: "Hims & Hers", ats: ashby,   slug: hims-and-hers }  # 0 jobs as of 2026-10-20
-  - { name: Weave,       ats: ashby,      slug: weave }           # 0 jobs as of 2026-10-20
+  - { name: "Hims & Hers", ats: ashby,   slug: hims-and-hers }
+  - { name: Weave,       ats: ashby,      slug: weave }
   - { name: Arcadia,    ats: lever,      slug: arcadia }
 
 filter:
@@ -117,6 +117,19 @@ screening:
     engineering. Looking for Staff or Principal Engineer or Architect roles. Prefers
     US remote or Maine/Boston area. Not interested in management tracks, data science,
     design, or non-engineering roles.
+
+gmail_discovery:
+  enabled: false            # set to true to read job-alert emails from Gmail
+  alert_senders:
+    - jobalerts-noreply@linkedin.com
+    - jobs-noreply@linkedin.com
+    - donotreply@match.indeed.com
+    - team@hi.wellfound.com
+    - noreply@glassdoor.com
+  llm_fallback_enabled: true
+  llm_fallback_model: claude-haiku-4-5-20251001
+  # Credentials from K8s secret (env vars): GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN
+  # Run scripts/gmail_auth.py once locally to generate them.
 
 # HTTP client settings
 concurrency_limit: 3

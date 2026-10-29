@@ -23,11 +23,9 @@ from mcp.server.mcpserver import MCPServer, Context
 from job_watch import adapters as adapter_registry
 from job_watch.config import load as load_config
 from job_watch.db import JobStore
-from job_watch.models import AppConfig, CompanyConfig, ReviewStatus
+from job_watch.models import AppConfig, CompanyConfig
 
 logger = logging.getLogger(__name__)
-
-_VALID_STATUSES = {"new", "interested", "applied", "skipped"}
 
 
 # ── Lifespan: open/close MongoDB connection ───────────────────────────────────
@@ -151,8 +149,6 @@ async def stats(ctx: Context) -> dict:
     return await store.get_stats()
 
 
-# ── Write tools ───────────────────────────────────────────────────────────────
-
 @mcp.tool()
 async def mark_job(
     ctx: Context,
@@ -163,25 +159,23 @@ async def mark_job(
     """Set the review status on a job posting.
 
     Args:
-        job_id: The job_id string from search_jobs or new_since.
-        status: One of: new, interested, applied, skipped.
-        note: Optional short note explaining the decision (stored with the job).
+        job_id: The job_id string returned by search_jobs or new_since.
+        status: One of: interested, applied, skipped, new.
+        note: Optional free-text note (e.g. "applied via LinkedIn").
 
-    Every call is logged with timestamp and inputs.
-    Returns {"ok": true} on success or {"ok": false, "error": "..."} on failure.
+    Returns {"ok": true} on success, {"ok": false, "error": "..."} on failure.
     """
-    if status not in _VALID_STATUSES:
-        return {"ok": False, "error": f"Invalid status '{status}'. Use: {', '.join(sorted(_VALID_STATUSES))}"}
+    valid = {"new", "interested", "applied", "skipped"}
+    if status not in valid:
+        return {"ok": False, "error": f"Invalid status {status!r}. Valid: {', '.join(sorted(valid))}"}
 
     lc = ctx.request_context.lifespan_context
     store: JobStore = lc["store"]
-
-    logger.info("mark_job: job_id=%s status=%s note=%r", job_id, status, note or None)
-
-    ok = await store.update_review(job_id, status, note or None)  # type: ignore[arg-type]
-    if ok:
-        return {"ok": True, "job_id": job_id, "status": status}
-    return {"ok": False, "error": f"Job not found: {job_id}"}
+    from job_watch.models import ReviewStatus
+    updated = await store.update_review(job_id, status, note or None)  # type: ignore[arg-type]
+    if not updated:
+        return {"ok": False, "error": f"Job {job_id!r} not found"}
+    return {"ok": True}
 
 
 @mcp.tool()
@@ -295,9 +289,8 @@ Steps:
    Then show the first 2-3 sentences of the description.
 4. For each job, suggest a status based on the role's fit with my background
    (read the filter-criteria resource for context), but frame it as a suggestion.
-5. Ask me to confirm or override: interested / applied / skipped / leave as new.
-6. Call mark_job(job_id, status, note) with any note I provide.
-7. After all jobs, call stats() again to show the updated counts.
+5. Ask me for feedback: interested / applied / skipped / leave as new.
+6. After all jobs, call stats() again to show the updated counts.
 
 Keep the session conversational. One job at a time unless I ask for a batch.
 Note: matching judgments are suggestions — I make the final call.
