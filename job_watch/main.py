@@ -151,11 +151,12 @@ async def run(*, seed: bool = False, config_path: str | None = None) -> None:
     await store.ensure_index()
 
     # Gmail discovery — reads alert emails and logs new company leads
+    logger.info("gmail_discovery: enabled=%s", cfg.gmail_discovery.enabled)
     if cfg.gmail_discovery.enabled:
         try:
             await _run_gmail_discovery(cfg, store)
         except Exception as exc:
-            logger.error("gmail_discovery: failed: %s", exc)
+            logger.error("gmail_discovery: failed: %s", exc, exc_info=True)
 
     now = datetime.now(tz=timezone.utc)
 
