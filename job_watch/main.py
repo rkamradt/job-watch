@@ -12,7 +12,7 @@ import asyncio
 import logging
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import httpx
 
@@ -151,8 +151,6 @@ async def run(*, seed: bool = False, config_path: str | None = None) -> None:
     await store.ensure_index()
 
     # Gmail discovery — reads alert emails and logs new company leads
-    print(f"DEBUG gmail_discovery.enabled={cfg.gmail_discovery.enabled}", flush=True)
-    logger.info("gmail_discovery: enabled=%s", cfg.gmail_discovery.enabled)
     if cfg.gmail_discovery.enabled:
         try:
             await _run_gmail_discovery(cfg, store)

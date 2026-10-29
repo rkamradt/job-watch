@@ -58,6 +58,13 @@ async def parse_with_llm(
         logger.warning("llm_fallback: API error for message_id=%s: %s", message_id, exc)
         return []
 
+    # Strip markdown fences if the model wrapped the JSON
+    if raw.startswith("```"):
+        raw = raw.split("```", 2)[1]
+        if raw.startswith("json"):
+            raw = raw[4:]
+        raw = raw.strip()
+
     try:
         items = json.loads(raw)
         if not isinstance(items, list):
