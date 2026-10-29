@@ -199,22 +199,32 @@ async def run(*, seed: bool = False, config_path: str | None = None) -> None:
 
         await store.mark_closed(company.ats, company.name, active_ids, now)
 
-    store.close()
-
     if not new_matches:
         logger.info("No new matches this run.")
+        store.close()
         return
 
     logger.info("%d new match(es) found after keyword filter.", len(new_matches))
 
-    # AI screening (second pass) — only runs when enabled in config
-    if cfg.screening.enabled:
+    # AI scoring (second pass) — runs when either llm_scoring or screening is enabled
+    if cfg.llm_scoring.enabled:
+        screened = await screen_jobs(
+            new_matches, cfg.screening, store=store, scoring_cfg=cfg.llm_scoring
+        )
+    elif cfg.screening.enabled:
         screened = await screen_jobs(new_matches, cfg.screening)
     else:
-        screened = [ScreenedJob(scored=s, ai_passed=True, ai_reason="") for s in new_matches]
+        screened = [
+            ScreenedJob(
+                scored=s, llm_score=s.score * 10, ai_reason="",
+                level_match=True, remote_us=None, salary_min=None, used_fallback=False,
+            )
+            for s in new_matches
+        ]
 
     if not screened:
         logger.info("No matches survived AI screening this run.")
+        store.close()
         return
 
     if seed:
@@ -222,6 +232,7 @@ async def run(*, seed: bool = False, config_path: str | None = None) -> None:
         for item in screened:
             j = item.scored.job
             logger.info("  [seeded] %s — %s (%s)", j.company, j.title, j.location)
+        store.close()
         return
 
     gmail_user = os.environ["GMAIL_USER"]
@@ -234,6 +245,7 @@ async def run(*, seed: bool = False, config_path: str | None = None) -> None:
         gmail_app_password=gmail_app_password,
         to_addr=gmail_to,
     )
+    store.close()
 
 
 # ── check-slug subcommand ────────────────────────────────────────────────────

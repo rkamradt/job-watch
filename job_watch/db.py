@@ -142,6 +142,46 @@ class DiscoveredCompanyStore:
         return _discovered_to_dict(doc) if doc else None
 
 
+class ScoringUsageStore:
+    """Tracks daily LLM scoring call counts and estimated cost."""
+
+    # Approximate Haiku pricing (per token)
+    _INPUT_COST_PER_TOKEN = 0.25 / 1_000_000
+    _OUTPUT_COST_PER_TOKEN = 1.25 / 1_000_000
+
+    def __init__(self, client: motor.motor_asyncio.AsyncIOMotorClient) -> None:
+        self._col = client["job-watch"]["scoring_usage"]
+
+    def _today_key(self) -> str:
+        return datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")
+
+    async def get_today_calls(self) -> int:
+        doc = await self._col.find_one({"_id": self._today_key()})
+        return doc["calls"] if doc else 0
+
+    async def record(self, input_tokens: int, output_tokens: int) -> int:
+        """Increment today's call count. Returns the new total."""
+        cost = (
+            input_tokens * self._INPUT_COST_PER_TOKEN
+            + output_tokens * self._OUTPUT_COST_PER_TOKEN
+        )
+        result = await self._col.find_one_and_update(
+            {"_id": self._today_key()},
+            {
+                "$inc": {
+                    "calls": 1,
+                    "input_tokens": input_tokens,
+                    "output_tokens": output_tokens,
+                    "estimated_cost_usd": cost,
+                },
+                "$setOnInsert": {"date": datetime.now(tz=timezone.utc)},
+            },
+            upsert=True,
+            return_document=True,
+        )
+        return result["calls"] if result else 1
+
+
 class GmailStateStore:
     """Tracks Gmail history ID so each message is read exactly once."""
 
@@ -166,6 +206,7 @@ class JobStore:
         self._col = self._client["job-watch"]["seen_jobs"]
         self.gmail_state = GmailStateStore(self._client)
         self.discovered = DiscoveredCompanyStore(self._client)
+        self.scoring_usage = ScoringUsageStore(self._client)
 
     async def ensure_index(self) -> None:
         await self.discovered.ensure_index()
@@ -365,6 +406,33 @@ class JobStore:
         except Exception:
             return False
         return result.matched_count > 0
+
+    async def get_llm_score(self, ats: str, company: str, job_id: str) -> dict | None:
+        """Return the cached llm_score subdoc for a job, or None if not yet scored."""
+        doc = await self._col.find_one(
+            {"ats": ats, "company": company, "id": job_id},
+            projection={"llm_score": 1},
+        )
+        if doc and doc.get("llm_score"):
+            score = dict(doc["llm_score"])
+            if isinstance(score.get("scored_at"), datetime):
+                score["scored_at"] = score["scored_at"].isoformat()
+            return score
+        return None
+
+    async def save_llm_score(
+        self,
+        ats: str,
+        company: str,
+        job_id: str,
+        score_data: dict,
+    ) -> None:
+        """Persist llm_score on the job document. Only written once (setOnInsert semantics
+        are not used here — we just overwrite since it's idempotent)."""
+        await self._col.update_one(
+            {"ats": ats, "company": company, "id": job_id},
+            {"$set": {"llm_score": score_data}},
+        )
 
     def close(self) -> None:
         self._client.close()

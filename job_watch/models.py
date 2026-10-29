@@ -74,6 +74,21 @@ class ScreeningConfig(BaseModel):
     candidate_profile: str = ""
 
 
+class LlmScoringConfig(BaseModel):
+    enabled: bool = False
+    threshold: int = 70          # jobs below this are dropped before email
+    daily_cap: int = 200         # max LLM calls per calendar day
+    model: str = "claude-haiku-4-5-20251001"
+    remote_us_required: bool = True
+    dealbreakers: list[str] = Field(default_factory=lambda: [
+        "rust-only shop",
+        "go-only shop",
+        "mobile-first",
+        "on-site only",
+        "non-US remote only",
+    ])
+
+
 DiscoveredStatus = Literal["candidate", "active", "rejected"]
 
 
@@ -97,6 +112,7 @@ class AppConfig(BaseModel):
     companies: list[CompanyConfig]
     filter: FilterConfig = Field(default_factory=FilterConfig)
     screening: ScreeningConfig = Field(default_factory=ScreeningConfig)
+    llm_scoring: LlmScoringConfig = Field(default_factory=LlmScoringConfig)
     gmail_discovery: GmailDiscoveryConfig = Field(default_factory=GmailDiscoveryConfig)
     concurrency_limit: int = 3
     request_timeout_sec: int = 30

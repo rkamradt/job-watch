@@ -118,6 +118,19 @@ screening:
     US remote or Maine/Boston area. Not interested in management tracks, data science,
     design, or non-engineering roles.
 
+llm_scoring:
+  enabled: false          # set to true to use 0-100 fit scores instead of PASS/FAIL
+  threshold: 70           # jobs below this score are dropped before email
+  daily_cap: 200          # max LLM scoring calls per calendar day
+  model: claude-haiku-4-5-20251001
+  remote_us_required: true
+  dealbreakers:
+    - "rust-only shop"
+    - "go-only shop"
+    - "mobile-first"
+    - "on-site only"
+    - "non-US remote only"
+
 gmail_discovery:
   enabled: false            # set to true to read job-alert emails from Gmail
   alert_senders:
